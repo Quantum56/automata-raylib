@@ -19,6 +19,8 @@
 
 #define NEIGHBOR_THRESHOLD 3
 
+#define COVERAGE 0.2f
+
 
 typedef enum {
     paused = 0,
@@ -233,7 +235,7 @@ void printNeighbors(cell_board* board) {
 }
 
 void randomizeBoard(cell_board* board, Queue* q) {
-    const float coverage = 0.2;
+    const float coverage = COVERAGE;
     fprintf(stderr, "Randomizing board\n");
     resetQueue(q);
 
@@ -270,7 +272,7 @@ void clearBoard(cell_board* board) {
     }
 }
 
-void drawTile(cell_board* board, unsigned int mouse_x, unsigned int mouse_y) {
+void drawTile(cell_board* board, Queue* q, unsigned int mouse_x, unsigned int mouse_y) {
     size_t cell_i = round((float) BOARD_WIDTH * (float) mouse_x / (BOARD_WIDTH * CELL_WIDTH_PX) * 2);
     size_t cell_j = round((float) BOARD_HEIGHT * (float) mouse_y / (BOARD_HEIGHT * CELL_WIDTH_PX) * 2);
 
@@ -280,13 +282,18 @@ void drawTile(cell_board* board, unsigned int mouse_x, unsigned int mouse_y) {
     
     //printf("Drawing clicked tile at %zu, %zu ", cell_x, cell_y); 
     //printf("Mouse coords were %u, %u ", mouse_x, mouse_y);
-    board->cells[cell_i][cell_j].alive = !board->cells[cell_i][cell_j].alive;
+    bool* status = &board->cells[cell_i][cell_j].alive;
+
+    *status = !*status;
+
+    if(board->cells[cell_i][cell_j].alive)
+        setEnqueuedNCells(board, q, NULL, cell_i, cell_j);
 }
 
-void drawClickedTile(cell_board* board) {
+void drawClickedTile(cell_board* board, Queue* q) {
     //printf("Drawing clicked tile"); 
     
-    drawTile(board, GetMouseX(), GetMouseY());
+    drawTile(board, q, GetMouseX(), GetMouseY());
 }
 
 
@@ -332,7 +339,7 @@ int main(int argc, char **argv) {
                 //DrawText(TextFormat("Paused"), 80, CELL_WIDTH_PX * BOARD_HEIGHT + 20, 20, RED);
 
                 if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    drawClickedTile(board);
+                    drawClickedTile(board, queue);
                 }
 
                 int key_pressed = GetKeyPressed();
