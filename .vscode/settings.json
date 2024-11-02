@@ -4,6 +4,8 @@
         "cstdint": "cpp",
         "set.h": "c",
         "queue.h": "c",
-        "bmpfile.h": "c"
+        "bmpfile.h": "c",
+        "type_traits": "c",
+        "utility": "c"
     }
 }
