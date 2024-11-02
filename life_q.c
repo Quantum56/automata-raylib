@@ -21,6 +21,8 @@
 
 #define COVERAGE 0.2f
 
+#define GLIDER_I_0 12
+#define GLIDER_J_0 4
 
 typedef enum {
     paused = 0,
@@ -47,11 +49,13 @@ typedef struct {
     //unsigned int cn_cells[BOARD_WIDTH][BOARD_HEIGHT];
 } cell_board;
 
+void setEnqueuedNCells(cell_board* board, Queue* q, SimpleSet* s, size_t i_0, size_t j_0);
+
 void setCellBQ(cell_board* board, Queue* q, unsigned int i, unsigned int j, bool status) {
     board->cells[i][j].alive = status;
     if(status) {
         board->cells[i][j].enqueued = true;
-        enqueue(q, (uint64_t) &board->cells[i][j]);
+        setEnqueuedNCells(board, q, NULL, i, j);
     }
 }
 
@@ -297,6 +301,17 @@ void drawClickedTile(cell_board* board, Queue* q) {
 }
 
 
+void setBoardGlider(cell_board* board, Queue* q, size_t i_0, size_t j_0) {
+    bool glider[3][3] = { {dead, alive, dead}, {dead, dead, alive}, {alive, alive, alive} };
+
+    for(size_t i = 0; i < 3; i++) {
+        for(size_t j = 0; j < 3; j++) {
+            setCellBQ(board, q, j + j_0, i + i_0, glider[i][j]);
+        }
+    }
+
+}
+
 
 int main(int argc, char **argv) {
     srand(time(NULL));
@@ -355,6 +370,16 @@ int main(int argc, char **argv) {
                     
                     resetQueue(queue);
                     fprintf(stderr, "reset queue\n");
+                }
+
+                if(key_pressed == KEY_G) {
+                    clearBoard(board);
+                    fprintf(stderr, "cleared board\n");
+                    
+                    resetQueue(queue);
+                    fprintf(stderr, "reset queue\n");
+
+                    setBoardGlider(board, queue, GLIDER_I_0, GLIDER_J_0);
                 }
                 
                 if(key_pressed == KEY_SPACE) {
