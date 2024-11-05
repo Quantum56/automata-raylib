@@ -9,10 +9,8 @@
 #include "queue.h"
 #include "set.h"
 
-#define BOARD_WIDTH 50
-#define BOARD_HEIGHT 50
 
-#define CELL_WIDTH_PX 30
+//#define CELL_WIDTH_PX 30
 
 //#define SCREEN_WIDTH 1000
 //#define SCREEN_HEIGHT 1000
@@ -37,9 +35,9 @@ enum {
 GameMode mode = paused;
 
 // TODO: dynamically allocate cells depending on size specified at runtime
-//size_t board_width = 50; // default
-//size_t board_height = 50; // default
-//unsigned int cell_width = 30; // default
+size_t board_width = 50; // default
+size_t board_height = 50; // default
+unsigned int cell_width_px = 30; // default
 
 typedef struct {
     bool alive;
@@ -50,7 +48,7 @@ typedef struct {
 } cell;
 
 typedef struct {
-    cell cells[BOARD_WIDTH][BOARD_HEIGHT];
+    cell** cells;
     size_t board_width;
     size_t board_height;
     // TODO: dynamically allocate cells depending on size specified at runtime
@@ -79,11 +77,25 @@ void setCellC(cell* c, bool status) {
 
 cell_board* init_board(size_t width, size_t height) {
     cell_board* board = (cell_board*) malloc(sizeof(cell_board));
+
     if(board == NULL) {
         return NULL;
     }
-    for(size_t i = 0; i < BOARD_WIDTH; i++) {
-        for(size_t j = 0; j < BOARD_HEIGHT; j++) {
+
+    board->cells = malloc(board_width * sizeof(cell*));
+    for (size_t i = 0; i < board_width; i++)
+        board->cells[i] = malloc(board_height * sizeof(cell));
+
+    board->board_width = board_width;
+    board->board_height = board_height;
+
+    if(board->cells == NULL) {
+        free(board);
+        return NULL;
+    }
+
+    for(size_t i = 0; i < board_width; i++) {
+        for(size_t j = 0; j < board_height; j++) {
             board->cells[i][j].alive = dead;
             board->cells[i][j].neighbors = 0;
             board->cells[i][j].i = i;
@@ -94,6 +106,18 @@ cell_board* init_board(size_t width, size_t height) {
     return board;
 }
 
+void free_board(cell_board* board) {
+    if(board && board->cells) {
+        for (size_t i = 0; i < board->board_width; i++)
+            free(board->cells[i]);  // Free each row
+        free(board->cells);
+    }
+    if(board) {
+        free(board);
+    }
+}
+
+
 size_t calculateNeighbors(cell_board* board, size_t i_0, size_t j_0) {
     size_t sum = 0;
     for(int i = -1; i <= 1; i++) {
@@ -102,8 +126,8 @@ size_t calculateNeighbors(cell_board* board, size_t i_0, size_t j_0) {
                 continue;
             }
 
-            size_t neighbor_i = (i_0 + i + BOARD_WIDTH) % BOARD_WIDTH;
-            size_t neighbor_j = (j_0 + j + BOARD_HEIGHT) % BOARD_HEIGHT;
+            size_t neighbor_i = (i_0 + i + board_width) % board_width;
+            size_t neighbor_j = (j_0 + j + board_height) % board_height;
 
             //printf("Neighbor at (%u, %u): %u", (unsigned int) used_i, (unsigned int) used_j, (unsigned int) board->cells[used_i][used_j]);
             sum += (unsigned int) board->cells[neighbor_i][neighbor_j].alive;
@@ -115,8 +139,8 @@ size_t calculateNeighbors(cell_board* board, size_t i_0, size_t j_0) {
 }
 
 void updateAllNeighbors(cell_board* board) {
-    for(int i = 0; i < BOARD_WIDTH; i++)
-        for(int j = 0; j < BOARD_HEIGHT; j++)
+    for(int i = 0; i < board_width; i++)
+        for(int j = 0; j < board_height; j++)
             board->cells[i][j].neighbors = calculateNeighbors(board, i, j);
 }
 
@@ -142,12 +166,12 @@ void setEnqueuedNCells(cell_board* board, Queue* q, SimpleSet* s, size_t i_0, si
         for(int j = -1; j <= 1; j++) {
             //fprintf(stderr, "Getting neighboring cell dims\n");
 
-            size_t neighbor_i = (i_0 + i + BOARD_WIDTH) % BOARD_WIDTH;
-            size_t neighbor_j = (j_0 + j + BOARD_HEIGHT) % BOARD_HEIGHT;
+            size_t neighbor_i = (i_0 + i + board_width) % board_width;
+            size_t neighbor_j = (j_0 + j + board_height) % board_height;
 
             //fprintf(stderr, "Setting neighboring cells\n");
             //printf("Neighbor at (%u, %u): %u", (unsigned int) used_i, (unsigned int) used_j, (unsigned int) board->cells[used_i][used_j]);
-            uint64_t key_addr = (uint64_t) ( (neighbor_i << ((unsigned int) log2(BOARD_WIDTH) + 1)) ) + neighbor_j;
+            uint64_t key_addr = (uint64_t) ( (neighbor_i << ((unsigned int) log2(board_width) + 1)) ) + neighbor_j;
             char key[8];
 
             for (int i = 0; i < 8; i++)
@@ -183,8 +207,8 @@ void updateBoard(cell_board* board, Queue* q) {
     //printf("Calculating neighbors");
     
 
-    for(size_t i = 0; i < BOARD_WIDTH; i++) {
-        for(size_t j = 0; j < BOARD_HEIGHT; j++) {
+    for(size_t i = 0; i < board_width; i++) {
+        for(size_t j = 0; j < board_height; j++) {
             bool cell = board->cells[i][j].alive;
             unsigned int neighbors = board->cells[i][j].neighbors;
             
@@ -208,14 +232,14 @@ void updateBoard(cell_board* board, Queue* q) {
 void drawBoard(cell_board* board) {
     BeginDrawing();
     ClearBackground(GRAY);
-    for(size_t i = 0; i < BOARD_WIDTH; i++) {
-        for(size_t j = 0; j < BOARD_HEIGHT; j++) {
+    for(size_t i = 0; i < board_width; i++) {
+        for(size_t j = 0; j < board_height; j++) {
             bool cell = board->cells[i][j].alive;
             Color color = BLACK;
             if(cell)
                 color = WHITE;
 
-            DrawRectangle(i * CELL_WIDTH_PX / 2, j * CELL_WIDTH_PX / 2, CELL_WIDTH_PX, CELL_WIDTH_PX, color);
+            DrawRectangle(i * cell_width_px / 2, j * cell_width_px / 2, cell_width_px, cell_width_px, color);
         }
     }
     EndDrawing();
@@ -223,8 +247,8 @@ void drawBoard(cell_board* board) {
 
 void printBoard(cell_board* board) {
     fprintf(stderr, "\n### New Board ###\n");
-    for(size_t i = 0; i < BOARD_WIDTH; i++) {
-        for(size_t j = 0; j < BOARD_HEIGHT; j++) {
+    for(size_t i = 0; i < board_width; i++) {
+        for(size_t j = 0; j < board_height; j++) {
             bool cell = board->cells[i][j].alive;
             if(cell)
                 fprintf(stderr, "*");
@@ -238,8 +262,8 @@ void printBoard(cell_board* board) {
 
 void printNeighbors(cell_board* board) {
     fprintf(stderr, "\n### New Board ###\n");
-    for(size_t i = 0; i < BOARD_WIDTH; i++) {
-        for(size_t j = 0; j < BOARD_HEIGHT; j++) {
+    for(size_t i = 0; i < board_width; i++) {
+        for(size_t j = 0; j < board_height; j++) {
             size_t neighbors = calculateNeighbors(board, i, j);
             fprintf(stderr, "%u ", (unsigned int) neighbors);
         }
@@ -257,8 +281,8 @@ void randomizeBoard(cell_board* board, Queue* q) {
 
     fprintf(stderr, "Gotten board set\n");
 
-    for(size_t i = 0; i < BOARD_WIDTH; i++) {
-        for(size_t j = 0; j < BOARD_HEIGHT; j++) {
+    for(size_t i = 0; i < board_width; i++) {
+        for(size_t j = 0; j < board_height; j++) {
             if((float) rand()/RAND_MAX > (1 - coverage)) {
                 //fprintf(stderr, "Setting single cell\n");
                 setCellB(board, i, j, alive);
@@ -275,8 +299,8 @@ void randomizeBoard(cell_board* board, Queue* q) {
 
 
 void clearBoard(cell_board* board) {
-    for(size_t i = 0; i < BOARD_WIDTH; i++) {
-        for(size_t j = 0; j < BOARD_HEIGHT; j++) {
+    for(size_t i = 0; i < board_width; i++) {
+        for(size_t j = 0; j < board_height; j++) {
             board->cells[i][j].alive = dead;
             board->cells[i][j].neighbors = 0;
             //board->cells[i][j].i = i;
@@ -286,10 +310,10 @@ void clearBoard(cell_board* board) {
 }
 
 void drawTile(cell_board* board, Queue* q, unsigned int mouse_x, unsigned int mouse_y) {
-    size_t cell_i = round((float) BOARD_WIDTH * (float) mouse_x / (BOARD_WIDTH * CELL_WIDTH_PX) * 2);
-    size_t cell_j = round((float) BOARD_HEIGHT * (float) mouse_y / (BOARD_HEIGHT * CELL_WIDTH_PX) * 2);
+    size_t cell_i = round((float) board_width * (float) mouse_x / (board_width * cell_width_px) * 2);
+    size_t cell_j = round((float) board_height * (float) mouse_y / (board_height * cell_width_px) * 2);
 
-    if(cell_i > BOARD_WIDTH || cell_j > BOARD_HEIGHT) {
+    if(cell_i > board_width || cell_j > board_height) {
         return;
     }
     
@@ -321,17 +345,41 @@ void setBoardGlider(cell_board* board, Queue* q, size_t i_0, size_t j_0) {
 
 }
 
+unsigned long safe_atoi(const char *str) {
+    unsigned long value;
+    if (sscanf(str, "%zu", &value) == 1) {
+        return value;
+    } else {
+        // Handle conversion error
+        fprintf(stderr, "Invalid input\n");
+        return 0;
+    }
+}
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
     srand(time(NULL));
 
-    for (int i = 0; i < argc; i++) {
-        printf("%s\n", argv[i]);
+
+    //fprintf(stderr, "Num args: %i", argc);
+    if(argc >= 3) {
+        for (int i = 0; i < argc; i++) {
+            printf("%s\n", argv[i]);
+        }
+
+        board_width = (size_t) safe_atoi(argv[1]);
+        board_height = (size_t) safe_atoi(argv[2]);
+
+        if(argc >= 4) {
+            cell_width_px = (unsigned) safe_atoi(argv[3]);
+        }
     }
 
-    fprintf(stderr, "Started prog\n");
 
-    cell_board* board = init_board(BOARD_WIDTH, BOARD_HEIGHT);
+
+    fprintf(stderr, "Started prog, board = (%zu x %zu)\n", board_width, board_height);
+
+    cell_board* board = init_board(board_width, board_width);
+    
     Queue* queue = malloc(sizeof(Queue));
     initializeQueue(queue);
 
@@ -344,7 +392,7 @@ int main(int argc, char **argv) {
 
     fprintf(stderr, "Gotten board\n");
     
-    InitWindow(BOARD_WIDTH * CELL_WIDTH_PX / 2, BOARD_HEIGHT * CELL_WIDTH_PX / 2, "GoL (rip Conway)");
+    InitWindow(board_width * cell_width_px / 2, board_height * cell_width_px / 2, "GoL (rip Conway)");
 
     SetTargetFPS(120);
 
@@ -376,7 +424,6 @@ int main(int argc, char **argv) {
                     clearBoard(board);
                     randomizeBoard(board, queue);
                 }
-n
 
                 if(key_pressed == KEY_C) {
                     clearBoard(board);
@@ -402,7 +449,6 @@ n
                     SetWindowTitle("GoL (rip Conway) : (running)");
                     continue;
                 }
-                
 
                 break;
 
@@ -416,6 +462,15 @@ n
                     SetWindowTitle("GoL (rip Conway) : (paused)");
                     continue;
                 }
+
+                if(key_pressed == KEY_EQUAL) {
+
+                }
+
+                if(key_pressed == KEY_MINUS) {
+                    
+                }
+
                 updateBoard(board, queue);
 
                 break;
@@ -432,7 +487,7 @@ n
     
     CloseWindow();
     //printf("%zu", sizeof(cell_board));
-    free(board);
+    free_board(board);
     free(queue);
     return 0;
 }

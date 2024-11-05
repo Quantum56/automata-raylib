@@ -82,20 +82,20 @@ cell_board* init_board(size_t width, size_t height) {
         return NULL;
     }
 
-    board->cells = malloc(board_width * sizeof(cell*));
-    for (size_t i = 0; i < board_width; i++)
-        board->cells[i] = malloc(board_height * sizeof(cell));
+    board->cells = malloc(width * sizeof(cell*));
+    for (size_t i = 0; i < width; i++)
+        board->cells[i] = malloc(height * sizeof(cell));
 
-    board->board_width = board_width;
-    board->board_height = board_height;
+    board->board_width = width;
+    board->board_height = height;
 
     if(board->cells == NULL) {
         free(board);
         return NULL;
     }
 
-    for(size_t i = 0; i < board_width; i++) {
-        for(size_t j = 0; j < board_height; j++) {
+    for(size_t i = 0; i < width; i++) {
+        for(size_t j = 0; j < height; j++) {
             board->cells[i][j].alive = dead;
             board->cells[i][j].neighbors = 0;
             board->cells[i][j].i = i;
@@ -139,8 +139,8 @@ size_t calculateNeighbors(cell_board* board, size_t i_0, size_t j_0) {
 }
 
 void updateAllNeighbors(cell_board* board) {
-    for(int i = 0; i < board_width; i++)
-        for(int j = 0; j < board_height; j++)
+    for(size_t i = 0; i < board_width; i++)
+        for(size_t j = 0; j < board_height; j++)
             board->cells[i][j].neighbors = calculateNeighbors(board, i, j);
 }
 
@@ -378,7 +378,7 @@ int main(int argc, char** argv) {
 
     fprintf(stderr, "Started prog, board = (%zu x %zu)\n", board_width, board_height);
 
-    cell_board* board = init_board(board_width, board_width);
+    cell_board* board = init_board(board_width, board_height);
     
     Queue* queue = malloc(sizeof(Queue));
     initializeQueue(queue);
@@ -462,6 +462,15 @@ int main(int argc, char** argv) {
                     SetWindowTitle("GoL (rip Conway) : (paused)");
                     continue;
                 }
+
+                if(key_pressed == KEY_EQUAL) {
+
+                }
+
+                if(key_pressed == KEY_MINUS) {
+                    
+                }
+
                 updateBoard(board, queue);
 
                 break;

@@ -6,6 +6,11 @@
         "queue.h": "c",
         "bmpfile.h": "c",
         "type_traits": "c",
-        "utility": "c"
+        "utility": "c",
+        "complex": "cpp",
+        "numeric": "cpp",
+        "cmath": "cpp",
+        "gsl_complex.h": "c",
+        "gsl_complex_math.h": "c"
     }
 }
