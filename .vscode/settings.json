@@ -11,6 +11,7 @@
         "numeric": "cpp",
         "cmath": "cpp",
         "gsl_complex.h": "c",
-        "gsl_complex_math.h": "c"
+        "gsl_complex_math.h": "c",
+        "types.h": "c"
     }
 }

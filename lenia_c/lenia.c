@@ -4,10 +4,33 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
+#include <assert.h>
+
+//#define OMP
+
+#ifdef OMP
+#include <omp.h>
+#endif
+
+
+#ifdef _WIN32
+  #include <windows.h>
+  #include <synchapi.h>
+#elif __linux__
+  #include <unistd.h>
+  #include <sys/types.h>
+#elif __APPLE__
+  #include <TargetConditionals.h>
+  #if TARGET_OS_MAC
+    #include <unistd.h>
+  #endif
+#endif
 
 #include "raylib.h"
-#include "queue.h"
+#include "queue_d.h"
 #include "set.h"
+
+#define WAIT
 
 
 //#define CELL_WIDTH_PX 30
@@ -37,12 +60,12 @@ GameMode mode = paused;
 // TODO: dynamically allocate cells depending on size specified at runtime
 size_t board_width = 50; // default
 size_t board_height = 50; // default
-unsigned int cell_width_px = 30; // default
+unsigned int cell_width_px = 1; // default
 
 typedef struct {
     bool alive;
     bool enqueued;
-    unsigned int neighbors;
+    unsigned short neighbors;
     size_t i;
     size_t j;
 } cell;
@@ -83,6 +106,11 @@ cell_board* init_board(size_t width, size_t height) {
     }
 
     board->cells = malloc(width * sizeof(cell*));
+    if(board->cells == NULL) {
+        free(board);
+        return NULL;
+    }
+
     for (size_t i = 0; i < width; i++)
         board->cells[i] = malloc(height * sizeof(cell));
 
@@ -125,12 +153,17 @@ size_t calculateNeighbors(cell_board* board, size_t i_0, size_t j_0) {
             if(i == 0 && j == 0) {
                 continue;
             }
-
+            
+            #ifdef OMP
+            #pragma omp critical
+            #endif
+            {
             size_t neighbor_i = (i_0 + i + board_width) % board_width;
             size_t neighbor_j = (j_0 + j + board_height) % board_height;
-
+            
             //printf("Neighbor at (%u, %u): %u", (unsigned int) used_i, (unsigned int) used_j, (unsigned int) board->cells[used_i][used_j]);
             sum += (unsigned int) board->cells[neighbor_i][neighbor_j].alive;
+            }
 
         }
     }
@@ -139,7 +172,9 @@ size_t calculateNeighbors(cell_board* board, size_t i_0, size_t j_0) {
 }
 
 void updateAllNeighbors(cell_board* board) {
+    
     for(size_t i = 0; i < board_width; i++)
+        #pragma omp parallel for
         for(size_t j = 0; j < board_height; j++)
             board->cells[i][j].neighbors = calculateNeighbors(board, i, j);
 }
@@ -157,6 +192,35 @@ void updateEnqueuedNeighbors(cell_board* board, Queue* q) {
     }
 
     //free();
+
+}
+
+void updateEnqueuedNeighborsFor(cell_board* board, Queue* q) {
+    //printf("Getting enqueued neighbors");
+    cell** active_cells = calloc(q->size, sizeof(cell*));
+
+    size_t ctr = 0;
+    while(!isEmpty(q)) {
+        cell* c = (cell*) peek(q);
+        if(c)
+            active_cells[ctr++] = c;
+
+        dequeue(q);
+    }
+
+    assert(ctr != 0 && isEmpty(q));
+    
+    #ifdef OMP
+    #pragma omp parallel for
+    #endif
+    for(size_t i = 0; i < ctr; i++) {
+        cell* c = active_cells[i];
+        if(c) {
+            c->neighbors = calculateNeighbors(board, c->i, c->j);
+        }
+    }
+
+    free(active_cells);
 
 }
 
@@ -196,6 +260,7 @@ void setEnqueuedNCells(cell_board* board, Queue* q, SimpleSet* s, size_t i_0, si
 
 void updateBoard(cell_board* board, Queue* q) {
     updateEnqueuedNeighbors(board, q);
+    //updateEnqueuedNeighborsFor(board, q);
     //updateAllNeighbors(board);
     resetQueue(q);
 
@@ -208,6 +273,9 @@ void updateBoard(cell_board* board, Queue* q) {
     
 
     for(size_t i = 0; i < board_width; i++) {
+        #ifdef OMP
+        #pragma omp parallel for
+        #endif
         for(size_t j = 0; j < board_height; j++) {
             bool cell = board->cells[i][j].alive;
             unsigned int neighbors = board->cells[i][j].neighbors;
@@ -381,7 +449,7 @@ int main(int argc, char** argv) {
     cell_board* board = init_board(board_width, board_height);
     
     Queue* queue = malloc(sizeof(Queue));
-    initializeQueue(queue);
+    initializeQueue(queue, board->board_width * board->board_height);
 
     if (board == NULL) {
         return 1;  // Return 1 to indicate memory allocation failure
@@ -397,7 +465,7 @@ int main(int argc, char** argv) {
     SetTargetFPS(120);
 
     //randomizeBoard(board);
-    printBoard(board);
+    //printBoard(board);
     
     while (!WindowShouldClose()) {
         
@@ -454,8 +522,17 @@ int main(int argc, char** argv) {
 
             case running:
                 //DrawText(TextFormat("Running"), 80, CELL_WIDTH_PX * BOARD_HEIGHT + 20, 20, RED);
-                
+#ifdef WAIT
 
+#ifdef __linux__
+                usleep((__useconds_t) 100);
+#elif _WIN32
+                Sleep((DWORD) 1);
+#elif __APPLE__
+                usleep((useconds_t) 100);
+#endif
+
+#endif
                 if(key_pressed == KEY_SPACE) {
                     mode = paused;
                     SetTargetFPS(120);
@@ -488,6 +565,6 @@ int main(int argc, char** argv) {
     CloseWindow();
     //printf("%zu", sizeof(cell_board));
     free_board(board);
-    free(queue);
+    freeQueue(queue);
     return 0;
 }

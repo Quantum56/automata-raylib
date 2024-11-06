@@ -22,6 +22,7 @@ life:
 tests:
 	cc test.c -o ./bin/test -Wall -I~/raylib/src -lraylib -lm
 	cc test_raylib.c -o ./bin/test_raylib -Wall -I~/raylib/src -lraylib -lm
+	cc test2.c -o ./bin/test2 -Wall -I~/raylib/src -lraylib -lm
 
 clean:
 	rm -rf "test"

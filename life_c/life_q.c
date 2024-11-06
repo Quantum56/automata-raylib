@@ -42,9 +42,9 @@ unsigned int cell_width_px = 30; // default
 typedef struct {
     bool alive;
     bool enqueued;
-    unsigned int neighbors;
-    size_t i;
-    size_t j;
+    unsigned short neighbors;
+    uint32_t i;
+    uint32_t j;
 } cell;
 
 typedef struct {

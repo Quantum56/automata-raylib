@@ -1,5 +1,5 @@
 lenia: set bmp
-	cc lenia.c ./include/libset.a -o ./bin/lenia -Wall -Wextra -I~/raylib/src -lm -lraylib -I./include/
+	cc lenia.c ./include/libset.a -o ./bin/lenia -Wall -Wextra -I~/raylib/src -lm -lraylib -I./include/ -O3 -fopenmp
 
 set:
 	cc ./include/set.c -c -o ./include/set.o
